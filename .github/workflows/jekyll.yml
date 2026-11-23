@@ -6,10 +6,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
-  administration: write
 
 concurrency:
   group: "pages"
@@ -48,24 +47,44 @@ jobs:
           sed -e 's/<[^>]*>/ /g' _site/index.html
           echo "--- Publications page text ---"
           sed -e 's/<[^>]*>/ /g' _site/publications/index.html
-      - name: Enable GitHub Pages
-        continue-on-error: true
+      - name: Set up Pages publishing
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -sS -o /tmp/pages-enable.json -w '%{http_code}\n' -X POST \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages" \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages"
+          authHeader="Authorization: Bearer ${GITHUB_TOKEN}"
+          if curl -sfS "$api" -H "$authHeader" -H 'Accept: application/vnd.github+json' > /tmp/pages.json; then
+            echo "Pages is already enabled:"
+            cat /tmp/pages.json
+            exit 0
+          fi
+          echo "Attempting to enable Pages through the API:"
+          curl -sS -o /tmp/enable.json -w 'HTTP %{http_code}\n' -X POST "$api" \
+            -H "$authHeader" -H 'Accept: application/vnd.github+json' \
             -d '{"build_type":"workflow"}'
-          cat /tmp/pages-enable.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Check GitHub Pages settings
-        continue-on-error: true
-        run: |
-          curl -sS -o /tmp/pages-site.json -w '%{http_code}\n' \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages" \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json"
-          cat /tmp/pages-site.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cat /tmp/enable.json
+          if grep -q '"html_url"' /tmp/enable.json; then
+            exit 0
+          fi
+          echo "Publishing the built site to the gh-pages branch:"
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -rf /tmp/pages-publish
+          mkdir -p /tmp/pages-publish
+          cd /tmp/pages-publish
+          git init -q
+          git checkout -q --orphan gh-pages
+          cp -r "$GITHUB_WORKSPACE/_site/." .
+          touch .nojekyll
+          git add -A
+          git commit -q -m 'Publish personal homepage'
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c http.extraheader="$authHeader" push -q --force origin gh-pages
+          echo "Checking whether Pages was enabled by the gh-pages push:"
+          sleep 5
+          if curl -sfS "$api" -H "$authHeader" -H 'Accept: application/vnd.github+json' > /tmp/pages.json; then
+            cat /tmp/pages.json
+          else
+            echo "Pages could not be enabled automatically; removing the temporary branch."
+            git -c http.extraheader="$authHeader" push -q origin --delete gh-pages
+          fi
