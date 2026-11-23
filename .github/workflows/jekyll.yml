@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: "pages"
@@ -39,34 +37,11 @@ jobs:
         run: bundle exec jekyll build
         env:
           JEKYLL_ENV: production
-      - name: Inspect rendered pages
-        run: |
-          echo "Generated HTML pages:"
-          find _site -name '*.html' | sort
-          echo "--- Home page text ---"
-          sed -e 's/<[^>]*>/ /g' _site/index.html
-          echo "--- Publications page text ---"
-          sed -e 's/<[^>]*>/ /g' _site/publications/index.html
-      - name: Set up Pages publishing
+      - name: Publish built site to gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages"
-          authHeader="Authorization: Bearer ${GITHUB_TOKEN}"
-          if curl -sfS "$api" -H "$authHeader" -H 'Accept: application/vnd.github+json' > /tmp/pages.json; then
-            echo "Pages is already enabled:"
-            cat /tmp/pages.json
-            exit 0
-          fi
-          echo "Attempting to enable Pages through the API:"
-          curl -sS -o /tmp/enable.json -w 'HTTP %{http_code}\n' -X POST "$api" \
-            -H "$authHeader" -H 'Accept: application/vnd.github+json' \
-            -d '{"build_type":"workflow"}'
-          cat /tmp/enable.json
-          if grep -q '"html_url"' /tmp/enable.json; then
-            exit 0
-          fi
-          echo "Publishing the built site to the gh-pages branch:"
+          set -e
           git config --global user.name 'github-actions[bot]'
           git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
           rm -rf /tmp/pages-publish
@@ -78,13 +53,17 @@ jobs:
           touch .nojekyll
           git add -A
           git commit -q -m 'Publish personal homepage'
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git -c http.extraheader="$authHeader" push -q --force origin gh-pages
-          echo "Checking whether Pages was enabled by the gh-pages push:"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push -q --force origin gh-pages
+          echo "Checking GitHub Pages settings:"
           sleep 5
-          if curl -sfS "$api" -H "$authHeader" -H 'Accept: application/vnd.github+json' > /tmp/pages.json; then
-            cat /tmp/pages.json
-          else
-            echo "Pages could not be enabled automatically; removing the temporary branch."
-            git -c http.extraheader="$authHeader" push -q origin --delete gh-pages
+          code=$(curl -sS -o /tmp/pages.json -w '%{http_code}' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json')
+          echo "Pages API HTTP ${code}"
+          cat /tmp/pages.json
+          if [ "$code" != "200" ]; then
+            echo "Pages is not enabled by the branch push; removing the temporary branch."
+            git push -q origin --delete gh-pages
           fi
