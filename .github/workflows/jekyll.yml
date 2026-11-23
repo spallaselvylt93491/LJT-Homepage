@@ -1,4 +1,7 @@
-name: Build and publish personal homepage
+# Builds the personal homepage and publishes the generated site to the gh-pages branch.
+# GitHub Pages setup: in the repository settings, enable Pages with
+# "Deploy from a branch" -> gh-pages -> / (root).
+name: Deploy personal homepage to GitHub Pages
 
 on:
   push:
@@ -55,15 +58,4 @@ jobs:
           git commit -q -m 'Publish personal homepage'
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push -q --force origin gh-pages
-          echo "Checking GitHub Pages settings:"
-          sleep 5
-          code=$(curl -sS -o /tmp/pages.json -w '%{http_code}' \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages" \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H 'Accept: application/vnd.github+json')
-          echo "Pages API HTTP ${code}"
-          cat /tmp/pages.json
-          if [ "$code" != "200" ]; then
-            echo "Pages is not enabled by the branch push; removing the temporary branch."
-            git push -q origin --delete gh-pages
-          fi
+          echo "Published the built site to the gh-pages branch."
