@@ -16,7 +16,7 @@ permissions:
   id-token: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+# However, do NOT cancel in-progress runs as we want to allow them to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -51,6 +51,14 @@ jobs:
         run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
         env:
           JEKYLL_ENV: production
+      - name: Inspect rendered pages
+        run: |
+          echo "Generated HTML pages:"
+          find _site -name '*.html' | sort
+          echo "--- Home page text ---"
+          sed -e 's/<[^>]*>/ /g' _site/index.html
+          echo "--- Publications page text ---"
+          sed -e 's/<[^>]*>/ /g' _site/publications/index.html
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5.0.0
 
