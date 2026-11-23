@@ -209,19 +209,21 @@ kramdown:
   enable_coderay: false
 
 
-# These settings control the types of collections used by the template
+# These settings control the types of collections used by the template.
+# Publication records are listed on the about page and the publications page;
+# no additional per-publication pages are generated.
 collections:
   teaching:
-    output: true
+    output: false
     permalink: /:collection/:path/
   publications:
-    output: true
+    output: false
     permalink: /:collection/:path/
   portfolio:
-    output: true
+    output: false
     permalink: /:collection/:path/
   talks:
-    output: true
+    output: false
     permalink: /:collection/:path/
 
 

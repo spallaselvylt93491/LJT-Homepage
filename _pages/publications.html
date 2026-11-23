@@ -9,9 +9,17 @@ author_profile: true
   <div class="wordwrap">You can also find my articles on <a href="{{site.author.googlescholar}}">my Google Scholar profile</a>.</div>
 {% endif %}
 
-{% include base_path %}
-
-{% assign publications_by_year = site.publications | sort: "pub_order" %}
-{% for post in publications_by_year %}
-  {% include archive-single.html %}
+{% comment %} Publication records carry only the publication year that is known; pub_order keeps them in reverse chronological order. {% endcomment %}
+{% assign ordered_publications = site.publications | sort: "pub_order" %}
+{% for post in ordered_publications %}
+  <div class="list__item">
+    <article class="archive__item" itemscope itemtype="http://schema.org/CreativeWork">
+      <h2 class="archive__item-title" itemprop="headline">{{ post.title }}</h2>
+      <p itemprop="author">{{ post.authors | replace: "Junteng Liu", "<strong>Junteng Liu</strong>" }}</p>
+      <p>Published in <i>{{ post.venue }}</i>, {{ post.pub_year }}{% if post.first_author %} — First author{% endif %}</p>
+      {% if post.code_repository %}
+      <p>GitHub code repository: {{ post.code_repository }}</p>
+      {% endif %}
+    </article>
+  </div>
 {% endfor %}
